@@ -9,15 +9,19 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.TupleBinding;
+import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
 import com.sleepycat.db.DatabaseException;
 import com.sleepycat.db.Environment;
 import com.sleepycat.db.EnvironmentConfig;
 import com.sleepycat.db.LockDetectMode;
 import com.sleepycat.db.SecondaryConfig;
+import com.sleepycat.db.SecondaryDatabase;
 import com.trgr.berkeleydb.search.SessionCase;
 import com.trgr.berkeleydb.search.SessionCaseFactory;
 import com.trgr.berkeleydb.service.BerkeleyStateBlockImpl;
@@ -30,12 +34,17 @@ import com.trgr.cobalt.search.berkeley.BerkeleyProduct;
 import com.trgr.cobalt.search.berkeley.BerkeleyStateBlock;
 import com.trgr.cobalt.search.berkeley.BerkeleyStateBlockManager;
 import com.trgr.cobalt.search.berkeley.DefaultBerkeleyStateBlock;
+import com.trgr.cobalt.search.berkeley.DefaultBerkeleyStateBlockManager;
+import com.trgr.cobalt.search.berkeley.WeakBerkeleyStateBlock;
 import com.trgr.cobalt.search.berkeley.WeakDefaultBerkeleyStateBlock;
 import com.trgr.cobalt.search.berkeley.sessionobjects.SessionObjectFactory;
 import com.trgr.cobalt.search.concurrent.CobaltThreadFactory;
 import com.trgr.cobalt.search.concurrent.CobaltThreadPoolExecutor;
 import com.trgr.cobalt.search.util.IntegerBinding;
 import com.trgr.cobalt.search.util.StringBinding;
+import com.trgr.cobalt.search.web.session.DefaultTransactionalSessionFactory;
+
+import static org.apache.commons.lang3.StringUtils.removeEnd;
 
 @Configuration
 public class DefaultBerkeleyStateBlockManagerImpl extends BerkeleyStateBlockManager {
@@ -142,7 +151,7 @@ public class DefaultBerkeleyStateBlockManagerImpl extends BerkeleyStateBlockMana
 		caseMetadata.setKeyBinding(integerBinding());
 		caseMetadata.setSecondaryKeyBinding(optimizedStringBinding());
 		caseMetadata.setSessionObjectFactory(sessionCaseFactory());
-		caseMetadata.setClassToCreate(SessionCase.class);
+		caseMetadata.setClassToCreate(CaseMetadata.class);
 
 		List<BerkeleyConfig> searchBerkeleyConfigs = new ArrayList<>();
 		searchBerkeleyConfigs.add(caseMetadata);
@@ -228,7 +237,6 @@ public class DefaultBerkeleyStateBlockManagerImpl extends BerkeleyStateBlockMana
 	@Override
 	public synchronized WeakDefaultBerkeleyStateBlock getStateBlock() {
 		WeakDefaultBerkeleyStateBlock weak = new WeakDefaultBerkeleyStateBlock(berkeleyStateBlock);
-		getCurrentWeakReferenceSet().addWeakBerkeleyStateBlock(weak);
 		return weak;
 	}
 
