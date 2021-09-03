@@ -1,12 +1,9 @@
 package com.trgr.berkeleydb.service;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -14,168 +11,207 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import com.google.common.collect.ImmutableList;
 import com.sleepycat.bind.tuple.TupleBinding;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseException;
-import com.sleepycat.db.Environment;
-import com.sleepycat.db.EnvironmentConfig;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.stereotype.Service;
-
-import com.trgr.cobalt.infrastructure.util.ReflectionUtils;
-
-import com.trgr.cobalt.search.berkeley.BerkeleyConfig;
-import com.trgr.cobalt.search.berkeley.BerkeleyDataAccess;
-import com.trgr.cobalt.search.berkeley.BerkeleyProduct;
-import com.trgr.cobalt.search.berkeley.BerkeleyStateBlockManager;
-import com.trgr.cobalt.search.berkeley.WeakDefaultBerkeleyStateBlock;
-import com.trgr.cobalt.search.berkeley.sessionobjects.SessionObjectFactory;
-import com.trgr.cobalt.search.dal.SimpleDataAccess;
-import com.trgr.cobalt.search.dal.UnifiedDataAccessObject;
+import com.sleepycat.db.SecondaryDatabase;
 import com.trgr.berkeleydb.config.DefaultBerkeleyStateBlockManagerImpl;
 import com.trgr.berkeleydb.search.SessionCase;
 import com.trgr.cobalt.dw.objects.reportbuilderdocs.cases.CaseMetadata;
+import com.trgr.cobalt.infrastructure.util.ReflectionUtils;
+import com.trgr.cobalt.search.berkeley.BerkeleyConfig;
+import com.trgr.cobalt.search.berkeley.BerkeleyDataAccess;
+import com.trgr.cobalt.search.berkeley.BerkeleyMultiDataAccess;
+import com.trgr.cobalt.search.berkeley.WeakDefaultBerkeleyStateBlock;
+import com.trgr.cobalt.search.berkeley.sessionobjects.SessionObjectFactory;
+import com.trgr.cobalt.search.dal.SimpleDataAccess;
+import com.trgr.cobalt.search.dal.SimpleMultiDataAccess;
 
 @Service
-public class BerkeleyAppService
-{
+public class BerkeleyAppService {
 
-    private List<DefaultBerkeleyStateBlockManagerImpl> berkeleyStateBlockManagers;
+	private List<DefaultBerkeleyStateBlockManagerImpl> berkeleyStateBlockManagers;
+	private Map<String, DefaultBerkeleyStateBlockManagerImpl> managersByDatabase;
+	private Map<String, BerkeleyConfig> configsByDatabase;
 
-    
-    private String stripDbSuffix(final String database)
-    {
-        return database.substring(0, database.length() - ".db".length()); //$NON-NLS-1$
-    }
-    
+	private String stripDbSuffix(final String database) {
+		return database.substring(0, database.length() - ".db".length()); //$NON-NLS-1$
+	}
 
-	
 	public BerkeleyAppService(
 			@Autowired(required = true) final List<DefaultBerkeleyStateBlockManagerImpl> berkeleyStateBlockManagers)
 			throws DatabaseException, IOException {
 		this.berkeleyStateBlockManagers = berkeleyStateBlockManagers;
+
+		managersByDatabase = new HashMap<>();
+		configsByDatabase = new HashMap<>();
+
+		for (final DefaultBerkeleyStateBlockManagerImpl manager : berkeleyStateBlockManagers) {
+			for (final BerkeleyConfig config : manager.getConfigs()) {
+				managersByDatabase.put(stripDbSuffix(config.getFilePath()), manager);
+				configsByDatabase.put(stripDbSuffix(config.getFilePath()), config);
+			}
+		}
+
 	}
-	 
-    
 
-    public List<Object> listEntries(final String database, final int limit)
-    {
-        if (berkeleyStateBlockManagers == null)
-        {
-            return ImmutableList.of();
-        }
-        
-        final Map<String, DefaultBerkeleyStateBlockManagerImpl> managersByDatabase = new HashMap<>();
-        final Map<String, BerkeleyConfig> configsByDatabase = new HashMap<>();
+	public List<Object> listEntries(final String database, final int limit) throws FileNotFoundException {
+		if (berkeleyStateBlockManagers == null) {
+			return ImmutableList.of();
+		}
 
-        for (final DefaultBerkeleyStateBlockManagerImpl manager : berkeleyStateBlockManagers)
-        {
-            for (final BerkeleyConfig config : manager.getConfigs())
-            {
-                managersByDatabase.put(stripDbSuffix(config.getFilePath()), manager);
-                configsByDatabase.put(stripDbSuffix(config.getFilePath()), config);
-            }
-        }
+		final Map<String, DefaultBerkeleyStateBlockManagerImpl> managersByDatabase = new HashMap<>();
+		final Map<String, BerkeleyConfig> configsByDatabase = new HashMap<>();
 
-        final DefaultBerkeleyStateBlockManagerImpl bsbm = managersByDatabase.get(database);
-        final BerkeleyConfig conf = configsByDatabase.get(database);
+		for (final DefaultBerkeleyStateBlockManagerImpl manager : berkeleyStateBlockManagers) {
+			for (final BerkeleyConfig config : manager.getConfigs()) {
+				managersByDatabase.put(stripDbSuffix(config.getFilePath()), manager);
+				configsByDatabase.put(stripDbSuffix(config.getFilePath()), config);
+			}
+		}
 
-        final WeakDefaultBerkeleyStateBlock stateBlock = bsbm.getStateBlock();
+		final DefaultBerkeleyStateBlockManagerImpl bsbm = managersByDatabase.get(database);
+		final BerkeleyConfig conf = configsByDatabase.get(database);
 
-        final Database bdb = stateBlock.getDatabase(conf.getFilePath());
+		final WeakDefaultBerkeleyStateBlock stateBlock = bsbm.getStateBlock();
 
-        final TupleBinding<?> valueBinding = ReflectionUtils.readField(
-            ReflectionUtils.getField(conf.getSessionObjectFactory().getClass(), "valueBinding"), conf.getSessionObjectFactory()); //$NON-NLS-1$
+		final Database bdb = stateBlock.getDatabase(conf.getFilePath());
 
-        final Iterator<?> iter = berkeleyEntries(bdb, conf.getKeyBinding(),
-            valueBinding != null ? new SessionObjectFactory<>(valueBinding) : conf.getSessionObjectFactory()).iterator();
+		final TupleBinding<?> valueBinding = ReflectionUtils.readField(
+				ReflectionUtils.getField(conf.getSessionObjectFactory().getClass(), "valueBinding"), //$NON-NLS-1$
+				conf.getSessionObjectFactory());
 
-        final List<Object> entries = new ArrayList<>();
+		final Iterator<?> iter = berkeleyEntries(bdb, conf.getKeyBinding(),
+				valueBinding != null ? new SessionObjectFactory<>(valueBinding) : conf.getSessionObjectFactory())
+						.iterator();
 
-        int count = 0;
-        while (count < limit && iter.hasNext())
-        {
-            count++;
-            final Object doc = iter.next();
-            
-            entries.add(doc);
-        }
+		final List<Object> entries = new ArrayList<>();
 
-        return entries;
-    }
+		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100k.txt");
+		// Instantiating the PrintStream class
+		PrintStream stream = new PrintStream(file);
+		try
+		{
+			int count = 0;
+			while (count < limit && iter.hasNext()) {
+				count++;
+				final CaseMetadata doc = (CaseMetadata) iter.next();
+				stream.append(doc.getSearchKey() + " ");
+				entries.add(doc);
+			}
+		}
+		finally
+		{
+			stream.flush();
+			stream.close();
+		}
 
-    protected Iterable<?> berkeleyEntries(final Database database,
-        final TupleBinding<?> keyBinding,
-        final SessionObjectFactory<?, ?> sessionObjectFactory)
-    {
-        return new BerkeleyDataAccess<>(database, keyBinding, sessionObjectFactory);
-    }
+		return entries;
+	}
 
-    public List<String> listDatabases()
-    {
-        if (berkeleyStateBlockManagers == null)
-        {
-            return ImmutableList.of();
-        }
-        final List<String> dbs = new ArrayList<>();
+	public List<String> listDatabases() {
+		if (berkeleyStateBlockManagers == null) {
+			return ImmutableList.of();
+		}
+		final List<String> dbs = new ArrayList<>();
 
-        for (final DefaultBerkeleyStateBlockManagerImpl manager : berkeleyStateBlockManagers)
-        {
-            for (final BerkeleyConfig config : manager.getConfigs())
-            {
-                dbs.add(stripDbSuffix(config.getFilePath()));
-            }
-        }
+		for (final DefaultBerkeleyStateBlockManagerImpl manager : berkeleyStateBlockManagers) {
+			for (final BerkeleyConfig config : manager.getConfigs()) {
+				dbs.add(stripDbSuffix(config.getFilePath()));
+			}
+		}
 
-        return dbs;
-    }
-    
-    
+		return dbs;
+	}
+
 	public List<Long> listEntriesTesting() throws IOException {
-		 File file =  new File("C:\\SearchModBerkeley\\CaseMetadata100k.txt");
-		 Scanner sc = new Scanner(file);
-		long durationInNano ;
-		long durationInMillis;
+		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100k.txt");
+		Scanner sc = new Scanner(file);
+		List<Long> fileTime = new ArrayList<>();
 		final List<Long> getTimeCaseMetadata = new ArrayList<>();
-		
-		List<Long> fileTime  =  new ArrayList<>();
- 
-			    while (sc.hasNextInt())
-			    {
-		            
-			    long startTime = System.nanoTime();
-			      
-				SessionCase caseMetadata = new SessionCase(sc.nextInt());
+
+		try {
+			long durationInNano;
+			long durationInMillis;
+
+			final DefaultBerkeleyStateBlockManagerImpl bsbm = managersByDatabase.get("CaseMetadata");
+			final BerkeleyConfig conf = configsByDatabase.get("CaseMetadata");
+
+			final WeakDefaultBerkeleyStateBlock stateBlock = bsbm.getStateBlock();
+
+			final Database bdb = stateBlock.getDatabase(conf.getFilePath());
+			final SecondaryDatabase secondaryDatabase = stateBlock.getSecondaryDatabase(conf.getSecondaryFilePath());
+
+			SimpleMultiDataAccess<Integer, String, SessionCase> simpleDataAccess = (SimpleMultiDataAccess<Integer, String, SessionCase>) getBerkeleyMultiDataAccess(bdb,
+					secondaryDatabase, conf.getKeyBinding(), conf.getSecondaryKeyBinding(), conf.getSessionObjectFactory());
+
+			int found = 0;
+			int missing = 0;
+			while (sc.hasNextInt()) {
+				long startTime = System.nanoTime();
+
+				// make call here
+
+				SessionCase caseMetadata = simpleDataAccess.getValue(sc.nextInt());
+				
+				if (caseMetadata == null)
+				{
+					missing++;
+				}
+				else
+				{
+					found++;
+				}
+				
+				if (found % 1000 == 0)
+				{
+					System.out.println("Found " + found);
+				}
 
 				long endTime = System.nanoTime();
-				 
-			     durationInNano = (endTime - startTime);  //Total execution time in nano seconds
-			     fileTime.add(durationInNano);
-			     durationInMillis = TimeUnit.NANOSECONDS.toMillis(durationInNano);  //Total execution time in milli seconds
-					/*
-					 * System.out.println("durationInNano : " + durationInNano);
-					 * System.out.println("durationInMillis: " + durationInMillis);
-					 * //System.out.println(caseMetadata.getBerkeleyObject().toString());
-					 */			  }
-			   
-			if(fileTime.size()>0)    
-			{ 
-				getTimeCaseMetadata.add(fileTime.stream().mapToLong(duration->duration.longValue()).sum()/fileTime.size());
-				getTimeCaseMetadata.add(TimeUnit.NANOSECONDS.toMillis(fileTime.stream().mapToLong(duration->duration.longValue()).sum()));
-			System.out.println("Average Time for 100K search Key calls in nanoseconds" + (fileTime.stream().mapToLong(duration->duration.longValue()).sum()/fileTime.size()));
-			System.out.println("Total Time for 100K search Key calls in milliseconds" + TimeUnit.NANOSECONDS.toMillis(fileTime.stream().mapToLong(duration->duration.longValue()).sum()));
-			}  
+
+				durationInNano = (endTime - startTime); // Total execution time in nano seconds
+				fileTime.add(durationInNano);
+				durationInMillis = TimeUnit.NANOSECONDS.toMillis(durationInNano);
+			}
 			
-			return getTimeCaseMetadata;
+			System.out.println("Found " + found + " out of " + (found + missing));
+		} finally {
+			sc.close();
+		}
+
+		if (fileTime.size() > 0) {
+			getTimeCaseMetadata
+					.add(fileTime.stream().mapToLong(duration -> duration.longValue()).sum() / fileTime.size());
+			getTimeCaseMetadata.add(
+					TimeUnit.NANOSECONDS.toMillis(fileTime.stream().mapToLong(duration -> duration.longValue()).sum()));
+			System.out.println("Average Time for 100K search Key calls in nanoseconds"
+					+ (fileTime.stream().mapToLong(duration -> duration.longValue()).sum() / fileTime.size()));
+			System.out.println("Total Time for 100K search Key calls in milliseconds" + TimeUnit.NANOSECONDS
+					.toMillis(fileTime.stream().mapToLong(duration -> duration.longValue()).sum()));
+		}
+
+		return getTimeCaseMetadata;
 	}
 
+	private SimpleMultiDataAccess<?, ?, ?> getBerkeleyMultiDataAccess(Database database, SecondaryDatabase secondaryDatabase, final TupleBinding<?> keyBinding,
+			final TupleBinding<?> secondaryKeyBinding, final SessionObjectFactory<?, ?> sessionObjectFactory) {
+		return new BerkeleyMultiDataAccess(database, secondaryDatabase, keyBinding,
+				secondaryKeyBinding, sessionObjectFactory);
+	}
 
+	protected SimpleDataAccess<?, ?> berkeleyEntries(final Database database, final TupleBinding<?> keyBinding,
+			final SessionObjectFactory<?, ?> sessionObjectFactory) {
+		return new BerkeleyDataAccess<>(database, keyBinding, sessionObjectFactory);
+	}
 
-
+	private SimpleDataAccess getBerkeleyDataAccess(Database database, BerkeleyConfig config) {
+		return new BerkeleyDataAccess(//
+				database, config.getKeyBinding(), config.getSessionObjectFactory());
+	}
 }

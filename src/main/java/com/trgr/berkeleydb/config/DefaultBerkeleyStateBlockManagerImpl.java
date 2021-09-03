@@ -151,7 +151,7 @@ public class DefaultBerkeleyStateBlockManagerImpl extends BerkeleyStateBlockMana
 		caseMetadata.setKeyBinding(integerBinding());
 		caseMetadata.setSecondaryKeyBinding(optimizedStringBinding());
 		caseMetadata.setSessionObjectFactory(sessionCaseFactory());
-		caseMetadata.setClassToCreate(CaseMetadata.class);
+		caseMetadata.setClassToCreate(SessionCase.class);
 
 		List<BerkeleyConfig> searchBerkeleyConfigs = new ArrayList<>();
 		searchBerkeleyConfigs.add(caseMetadata);
@@ -237,6 +237,7 @@ public class DefaultBerkeleyStateBlockManagerImpl extends BerkeleyStateBlockMana
 	@Override
 	public synchronized WeakDefaultBerkeleyStateBlock getStateBlock() {
 		WeakDefaultBerkeleyStateBlock weak = new WeakDefaultBerkeleyStateBlock(berkeleyStateBlock);
+		getCurrentWeakReferenceSet().addWeakBerkeleyStateBlock(weak);
 		return weak;
 	}
 
