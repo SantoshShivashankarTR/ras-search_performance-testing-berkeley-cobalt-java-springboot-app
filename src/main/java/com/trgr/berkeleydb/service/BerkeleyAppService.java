@@ -4,7 +4,10 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -133,7 +136,15 @@ public class BerkeleyAppService {
 		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100k.txt");
 		Scanner sc = new Scanner(file);
 		List<Long> fileTime = new ArrayList<>();
+
+		DateTimeFormatter timeStampPattern = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+		//System.out.println(timeStampPattern.format(java.time.LocalDateTime.now()));
+		String name = "CasesMetadata_Seq_BDBPrimary_" + (timeStampPattern.format(LocalDateTime.now()));
+		
 		final List<Long> getTimeCaseMetadata = new ArrayList<>();
+		File outputFile = new File("C:\\SearchModBerkeley\\" + name);
+		// Instantiating the PrintStream class
+		PrintStream stream = new PrintStream(outputFile);
 
 		try {
 			long durationInNano;
@@ -150,14 +161,21 @@ public class BerkeleyAppService {
 			SimpleMultiDataAccess<Integer, String, SessionCase> simpleDataAccess = (SimpleMultiDataAccess<Integer, String, SessionCase>) getBerkeleyMultiDataAccess(bdb,
 					secondaryDatabase, conf.getKeyBinding(), conf.getSecondaryKeyBinding(), conf.getSessionObjectFactory());
 
+			
+
+			String header = "Key \t" + "nano sec \t" + "milli sec";
+			stream.println(header);
+			
 			int found = 0;
 			int missing = 0;
+			
 			while (sc.hasNextInt()) {
 				long startTime = System.nanoTime();
 
 				// make call here
 
-				SessionCase caseMetadata = simpleDataAccess.getValue(sc.nextInt());
+				int nextInt = sc.nextInt();
+				SessionCase caseMetadata = simpleDataAccess.getValue(nextInt);
 				
 				if (caseMetadata == null)
 				{
@@ -178,10 +196,16 @@ public class BerkeleyAppService {
 				durationInNano = (endTime - startTime); // Total execution time in nano seconds
 				fileTime.add(durationInNano);
 				durationInMillis = TimeUnit.NANOSECONDS.toMillis(durationInNano);
+				
+				String content = nextInt + "\t" + durationInNano + "\t" + durationInMillis;
+				stream.println(content);
+				
 			}
 			
 			System.out.println("Found " + found + " out of " + (found + missing));
 		} finally {
+			stream.flush();
+			stream.close();
 			sc.close();
 		}
 
