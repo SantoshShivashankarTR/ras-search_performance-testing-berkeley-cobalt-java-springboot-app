@@ -47,7 +47,7 @@ public class BerkeleyDBController {
 	  @Autowired
 	    private BerkeleyAppService berkeleyService;
 	  
-	    @RequestMapping(method = RequestMethod.GET, path = "/bdb/{db}",
+	    @RequestMapping(method = RequestMethod.GET, path = "/bdb/listEntries/{db}",
 	        produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
 	    @ResponseBody
 	    public ResponseEntity<String> listEntries(
@@ -56,7 +56,7 @@ public class BerkeleyDBController {
 	    {
 	    	final BerkeleyEntries response = new BerkeleyEntries();
 	    	  response.setDatabase(database);
-	          response.setEntries(berkeleyService.listEntries(database, limit > 1 ? 10 : limit));
+	          response.setEntries(berkeleyService.listEntries(database, limit > 1 ? limit : 10));
 	    	
 	    	
 	        final ObjectMapper mapper = new ObjectMapper()
