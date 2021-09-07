@@ -98,6 +98,9 @@ public class BerkeleyAppService {
 		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100k.txt");
 		// Instantiating the PrintStream class
 		PrintStream stream = new PrintStream(file);
+		File guidsFile = new File("C:\\SearchModBerkeley\\CaseMetadata100kGuids.txt");
+		// Instantiating the PrintStream class
+		PrintStream guidsStream = new PrintStream(guidsFile);
 		try
 		{
 			int count = 0;
@@ -105,6 +108,7 @@ public class BerkeleyAppService {
 				count++;
 				final CaseMetadata doc = (CaseMetadata) iter.next();
 				stream.append(doc.getSearchKey() + " ");
+				guidsStream.println(doc.getGuid() + " ");
 				entries.add(doc);
 			}
 		}
@@ -112,6 +116,8 @@ public class BerkeleyAppService {
 		{
 			stream.flush();
 			stream.close();
+			guidsStream.flush();
+			guidsStream.close();
 		}
 
 		return entries;
@@ -133,7 +139,7 @@ public class BerkeleyAppService {
 	}
 
 	public List<Long> listEntriesTesting() throws IOException {
-		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100k.txt");
+		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100kGuidsToSearchKeys.txt");
 		Scanner sc = new Scanner(file);
 		List<Long> fileTime = new ArrayList<>();
 
@@ -154,14 +160,12 @@ public class BerkeleyAppService {
 			final BerkeleyConfig conf = configsByDatabase.get("CaseMetadata");
 
 			final WeakDefaultBerkeleyStateBlock stateBlock = bsbm.getStateBlock();
-
+			
 			final Database bdb = stateBlock.getDatabase(conf.getFilePath());
 			final SecondaryDatabase secondaryDatabase = stateBlock.getSecondaryDatabase(conf.getSecondaryFilePath());
 
 			SimpleMultiDataAccess<Integer, String, SessionCase> simpleDataAccess = (SimpleMultiDataAccess<Integer, String, SessionCase>) getBerkeleyMultiDataAccess(bdb,
 					secondaryDatabase, conf.getKeyBinding(), conf.getSecondaryKeyBinding(), conf.getSessionObjectFactory());
-
-			
 
 			String header = "Key \t" + "nano sec \t" + "milli sec";
 			stream.println(header);
@@ -170,11 +174,10 @@ public class BerkeleyAppService {
 			int missing = 0;
 			
 			while (sc.hasNextInt()) {
-				long startTime = System.nanoTime();
-
 				// make call here
-
 				int nextInt = sc.nextInt();
+				long startTime = System.nanoTime();				
+				
 				SessionCase caseMetadata = simpleDataAccess.getValue(nextInt);
 				
 				if (caseMetadata == null)
@@ -221,6 +224,85 @@ public class BerkeleyAppService {
 		}
 
 		return getTimeCaseMetadata;
+	}
+	
+	public void retrieveSearchKeys() throws IOException {
+		List<Long> fileTime = new ArrayList<>();
+		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100kGuids.txt");
+		Scanner sc = new Scanner(file);
+
+		final List<Long> getTimeCaseMetadata = new ArrayList<>();
+		File outputFile = new File("C:\\SearchModBerkeley\\CaseMetadata100kGuidsToSearchKeys.txt" );
+		// Instantiating the PrintStream class
+		PrintStream stream = new PrintStream(outputFile);
+		
+		DateTimeFormatter timeStampPattern = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+		//System.out.println(timeStampPattern.format(java.time.LocalDateTime.now()));
+		String name = "CasesMetadata_Seq_BDBSecondary_" + (timeStampPattern.format(LocalDateTime.now()));
+		
+		File outputFileRun = new File("C:\\SearchModBerkeley\\" + name);
+		// Instantiating the PrintStream class
+		PrintStream streamRun = new PrintStream(outputFileRun);
+
+		try {
+			
+			long durationInNano;
+			long durationInMillis;
+			final DefaultBerkeleyStateBlockManagerImpl bsbm = managersByDatabase.get("CaseMetadata");
+			final BerkeleyConfig conf = configsByDatabase.get("CaseMetadata");
+
+			final WeakDefaultBerkeleyStateBlock stateBlock = bsbm.getStateBlock();
+			
+			final Database bdb = stateBlock.getDatabase(conf.getFilePath());
+			final SecondaryDatabase secondaryDatabase = stateBlock.getSecondaryDatabase(conf.getSecondaryFilePath());
+
+			SimpleMultiDataAccess<Integer, String, SessionCase> simpleDataAccess = (SimpleMultiDataAccess<Integer, String, SessionCase>) getBerkeleyMultiDataAccess(bdb,
+					secondaryDatabase, conf.getKeyBinding(), conf.getSecondaryKeyBinding(), conf.getSessionObjectFactory());
+
+			int found = 0;
+			
+			String header = "Guid \t" + "SearchKey \t" + "nano sec \t" + "milli sec";
+			
+			while (sc.hasNextLine()) {
+				// make call here
+				String nextGuid = sc.nextLine().trim();
+				long startTime = System.nanoTime();				
+				SessionCase doc = simpleDataAccess.getSecondaryValue(nextGuid);
+				long endTime = System.nanoTime();
+
+				durationInNano = (endTime - startTime); // Total execution time in nano seconds
+				fileTime.add(durationInNano);
+				durationInMillis = TimeUnit.NANOSECONDS.toMillis(durationInNano);
+				
+				String content = doc.getGuid() + "\t" + doc.getSearchKey() + "\t" + durationInNano + "\t" + durationInMillis;
+				streamRun.println(content);
+				
+				stream.append(doc.getSearchKey() + " ");
+				found++;
+				if (found % 1000 == 0)
+				{
+					System.out.println("Found " + found);
+				}
+				
+			}
+		} finally {
+			stream.flush();
+			stream.close();
+			streamRun.flush();
+			streamRun.close();
+			sc.close();
+		}
+		
+		if (fileTime.size() > 0) {
+			getTimeCaseMetadata
+					.add(fileTime.stream().mapToLong(duration -> duration.longValue()).sum() / fileTime.size());
+			getTimeCaseMetadata.add(
+					TimeUnit.NANOSECONDS.toMillis(fileTime.stream().mapToLong(duration -> duration.longValue()).sum()));
+			System.out.println("Average Time for 100K search Key calls in nanoseconds"
+					+ (fileTime.stream().mapToLong(duration -> duration.longValue()).sum() / fileTime.size()));
+			System.out.println("Total Time for 100K search Key calls in milliseconds" + TimeUnit.NANOSECONDS
+					.toMillis(fileTime.stream().mapToLong(duration -> duration.longValue()).sum()));
+		}
 	}
 
 	private SimpleMultiDataAccess<?, ?, ?> getBerkeleyMultiDataAccess(Database database, SecondaryDatabase secondaryDatabase, final TupleBinding<?> keyBinding,
