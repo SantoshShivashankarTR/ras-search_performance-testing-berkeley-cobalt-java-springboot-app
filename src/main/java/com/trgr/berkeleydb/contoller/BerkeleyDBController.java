@@ -1,5 +1,6 @@
 package com.trgr.berkeleydb.contoller;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,6 +84,15 @@ public class BerkeleyDBController {
 		        return ResponseEntity.ok(mapper.writeValueAsString(response));
 		    }
 	    
+	    @RequestMapping(method = RequestMethod.GET, path = "/bdb/retrieveSearchKeys",
+		        produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+		@ResponseBody
+	    public ResponseEntity<String> getSearchKeysFromGuids() throws IOException
+	    {
+	        berkeleyService.retrieveSearchKeys();
+	        final ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+	        return ResponseEntity.ok(mapper.writeValueAsString("Done"));
+	    }
 
 	    @RequestMapping(method = RequestMethod.GET, path = "/bdb",
 	        produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
