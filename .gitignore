@@ -37,3 +37,5 @@ out/
 .vscode/
 
 .checkstyle
+/hs_err_pid12352.log
+/hs_err_pid14480.log
