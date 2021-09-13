@@ -9,19 +9,15 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.TupleBinding;
-import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
 import com.sleepycat.db.DatabaseException;
 import com.sleepycat.db.Environment;
 import com.sleepycat.db.EnvironmentConfig;
 import com.sleepycat.db.LockDetectMode;
 import com.sleepycat.db.SecondaryConfig;
-import com.sleepycat.db.SecondaryDatabase;
 import com.trgr.berkeleydb.search.SessionCase;
 import com.trgr.berkeleydb.search.SessionCaseFactory;
 import com.trgr.berkeleydb.service.BerkeleyStateBlockImpl;
@@ -34,23 +30,18 @@ import com.trgr.cobalt.search.berkeley.BerkeleyProduct;
 import com.trgr.cobalt.search.berkeley.BerkeleyStateBlock;
 import com.trgr.cobalt.search.berkeley.BerkeleyStateBlockManager;
 import com.trgr.cobalt.search.berkeley.DefaultBerkeleyStateBlock;
-import com.trgr.cobalt.search.berkeley.DefaultBerkeleyStateBlockManager;
-import com.trgr.cobalt.search.berkeley.WeakBerkeleyStateBlock;
 import com.trgr.cobalt.search.berkeley.WeakDefaultBerkeleyStateBlock;
 import com.trgr.cobalt.search.berkeley.sessionobjects.SessionObjectFactory;
 import com.trgr.cobalt.search.concurrent.CobaltThreadFactory;
 import com.trgr.cobalt.search.concurrent.CobaltThreadPoolExecutor;
 import com.trgr.cobalt.search.util.IntegerBinding;
 import com.trgr.cobalt.search.util.StringBinding;
-import com.trgr.cobalt.search.web.session.DefaultTransactionalSessionFactory;
-
-import static org.apache.commons.lang3.StringUtils.removeEnd;
 
 @Configuration
 public class DefaultBerkeleyStateBlockManagerImpl extends BerkeleyStateBlockManager {
 	
-
-	private String envPath = "\\\\C225yliappci.int.thomsonreuters.com\\appdb\\cache\\";
+	//String envPath = System.getProperty("berkeley.environment");
+	//private String envPath = "\\\\C225yliappci.int.thomsonreuters.com\\appdb\\cache\\";
 
 	public DefaultBerkeleyStateBlockManagerImpl(EnvironmentConfig environmentConfig, DatabaseConfig primaryConfig,
 			SecondaryConfig secondaryConfig, List<BerkeleyConfig> configs, long closeDatabaseHandlesTimeoutInMillis,
@@ -162,8 +153,10 @@ public class DefaultBerkeleyStateBlockManagerImpl extends BerkeleyStateBlockMana
 	
 	@Bean(initMethod = "initBerkeleyStateBlockManager", destroyMethod = "close")
 	@Primary
-	  public DefaultBerkeleyStateBlockManagerImpl searchBerkeleyStateBlockManager() throws DatabaseException, IOException { //
+    public DefaultBerkeleyStateBlockManagerImpl searchBerkeleyStateBlockManager() throws DatabaseException, IOException { //
 
+		String envPath = System.getProperty("berkeley.environment");
+		
 		  Environment environment = new Environment(new File(envPath), berkeleyEnvironmentLargeCacheConfig());
 		  BerkeleyStateBlockImpl berkeleyStateBlockImpl = new BerkeleyStateBlockImpl(environment);
 	  DefaultBerkeleyStateBlockManagerImpl searchBerkeleyStateBlockManager = new DefaultBerkeleyStateBlockManagerImpl(

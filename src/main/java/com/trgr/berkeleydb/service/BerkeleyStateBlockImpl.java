@@ -5,35 +5,31 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 
-import org.springframework.context.annotation.Bean;
-
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseException;
 import com.sleepycat.db.Environment;
 import com.sleepycat.db.EnvironmentConfig;
 import com.sleepycat.db.LockDetectMode;
 import com.sleepycat.db.SecondaryDatabase;
-import com.trgr.cobalt.infrastructure.berkeley.BerkeleyUtilities;
 import com.trgr.cobalt.search.berkeley.BerkeleyStateBlock;
-import static org.apache.commons.lang3.StringUtils.removeEnd;
-
 
 public class BerkeleyStateBlockImpl extends BerkeleyStateBlock
 {
 
-
 	public BerkeleyStateBlockImpl(Environment environment) throws FileNotFoundException, DatabaseException {
 		
 		super(environment());
-		String latestAvailability = getLatestProductAvailability("Search", "37");
-		System.setProperty(BERKELEY_DEFAULT_PATH , "\\\\C225yliappci.int.thomsonreuters.com\\appdb\\data/Search/37/" + latestAvailability);
-		System.setProperty(BERKELEY_LOADER_SWITCH, "ON");
+		//String latestAvailability = getLatestProductAvailability("Search", "37");
+		//System.setProperty(BERKELEY_DEFAULT_PATH , "\\\\C225yliappci.int.thomsonreuters.com\\appdb\\data/Search/37/" + latestAvailability);
+		//System.setProperty(BERKELEY_LOADER_SWITCH, "ON");
 	}
 	
-    public static String getLatestProductAvailability(final String product, final String version)
+    public static String getLatestProductAvailability(final String product, final String version, org.springframework.core.env.Environment env)
     {
+    	
+    	String path = System.getProperty("BerkeleyAppDBDirectory");
         File latestAvailableProductOffering =
-        		 new File("//C225yliappci.int.thomsonreuters.com/appdb/data" + "/" + product + "/" + version + "/LatestProductAvailability");
+        		 new File(path + "/" + product + "/" + version + "/LatestProductAvailability");
         if (latestAvailableProductOffering.exists())
         {
             BufferedReader br = null;
@@ -79,7 +75,8 @@ public class BerkeleyStateBlockImpl extends BerkeleyStateBlock
 	}
 
 	public static  Environment environment() throws FileNotFoundException, DatabaseException {
-	 String envPath = "\\\\C225yliappci.int.thomsonreuters.com\\appdb\\cache\\";
+		String envPath = System.getProperty("berkeley.environment");
+	 //String envPath = "\\\\C225yliappci.int.thomsonreuters.com\\appdb\\cache\\";
 	   Environment environment = new Environment(new File(envPath), envConfig());
 	   return environment;
 	}
