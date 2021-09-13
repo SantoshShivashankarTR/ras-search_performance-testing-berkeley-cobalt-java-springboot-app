@@ -40,8 +40,8 @@ import com.trgr.cobalt.search.util.StringBinding;
 @Configuration
 public class DefaultBerkeleyStateBlockManagerImpl extends BerkeleyStateBlockManager {
 	
-
-	private String envPath = "\\\\C225yliappci.int.thomsonreuters.com\\appdb\\cache\\";
+	//String envPath = System.getProperty("berkeley.environment");
+	//private String envPath = "\\\\C225yliappci.int.thomsonreuters.com\\appdb\\cache\\";
 
 	public DefaultBerkeleyStateBlockManagerImpl(EnvironmentConfig environmentConfig, DatabaseConfig primaryConfig,
 			SecondaryConfig secondaryConfig, List<BerkeleyConfig> configs, long closeDatabaseHandlesTimeoutInMillis,
@@ -153,8 +153,10 @@ public class DefaultBerkeleyStateBlockManagerImpl extends BerkeleyStateBlockMana
 	
 	@Bean(initMethod = "initBerkeleyStateBlockManager", destroyMethod = "close")
 	@Primary
-	  public DefaultBerkeleyStateBlockManagerImpl searchBerkeleyStateBlockManager() throws DatabaseException, IOException { //
+    public DefaultBerkeleyStateBlockManagerImpl searchBerkeleyStateBlockManager() throws DatabaseException, IOException { //
 
+		String envPath = System.getProperty("berkeley.environment");
+		
 		  Environment environment = new Environment(new File(envPath), berkeleyEnvironmentLargeCacheConfig());
 		  BerkeleyStateBlockImpl berkeleyStateBlockImpl = new BerkeleyStateBlockImpl(environment);
 	  DefaultBerkeleyStateBlockManagerImpl searchBerkeleyStateBlockManager = new DefaultBerkeleyStateBlockManagerImpl(

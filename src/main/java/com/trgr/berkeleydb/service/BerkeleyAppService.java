@@ -95,10 +95,10 @@ public class BerkeleyAppService {
 
 		final List<Object> entries = new ArrayList<>();
 
-		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100k.txt");
+		File file = new File("CaseMetadata100k.txt");
 		// Instantiating the PrintStream class
 		PrintStream stream = new PrintStream(file);
-		File guidsFile = new File("C:\\SearchModBerkeley\\CaseMetadata100kGuids.txt");
+		File guidsFile = new File("CaseMetadata100kGuids.txt");
 		// Instantiating the PrintStream class
 		PrintStream guidsStream = new PrintStream(guidsFile);
 		try
@@ -139,7 +139,7 @@ public class BerkeleyAppService {
 	}
 
 	public List<Long> listEntriesTesting() throws IOException {
-		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100kGuidsToSearchKeys.txt");
+		File file = new File("CaseMetadata100kGuidsToSearchKeys.txt");
 		Scanner sc = new Scanner(file);
 		List<Long> fileTime = new ArrayList<>();
 
@@ -148,7 +148,7 @@ public class BerkeleyAppService {
 		String name = "CasesMetadata_Seq_BDBPrimary_" + (timeStampPattern.format(LocalDateTime.now()));
 		
 		final List<Long> getTimeCaseMetadata = new ArrayList<>();
-		File outputFile = new File("C:\\SearchModBerkeley\\" + name);
+		File outputFile = new File(name);
 		// Instantiating the PrintStream class
 		PrintStream stream = new PrintStream(outputFile);
 
@@ -227,12 +227,14 @@ public class BerkeleyAppService {
 	}
 	
 	public void retrieveSearchKeys() throws IOException {
+		System.out.println("Here");
 		List<Long> fileTime = new ArrayList<>();
-		File file = new File("C:\\SearchModBerkeley\\CaseMetadata100kGuids.txt");
+		File file = new File("CaseMetadata100kGuids.txt");
+		System.out.println(file.getAbsolutePath());
 		Scanner sc = new Scanner(file);
 
 		final List<Long> getTimeCaseMetadata = new ArrayList<>();
-		File outputFile = new File("C:\\SearchModBerkeley\\CaseMetadata100kGuidsToSearchKeys.txt" );
+		File outputFile = new File("CaseMetadata100kGuidsToSearchKeys.txt" );
 		// Instantiating the PrintStream class
 		PrintStream stream = new PrintStream(outputFile);
 		
@@ -240,7 +242,7 @@ public class BerkeleyAppService {
 		//System.out.println(timeStampPattern.format(java.time.LocalDateTime.now()));
 		String name = "CasesMetadata_Seq_BDBSecondary_" + (timeStampPattern.format(LocalDateTime.now()));
 		
-		File outputFileRun = new File("C:\\SearchModBerkeley\\" + name);
+		File outputFileRun = new File(name);
 		// Instantiating the PrintStream class
 		PrintStream streamRun = new PrintStream(outputFileRun);
 
@@ -273,12 +275,18 @@ public class BerkeleyAppService {
 				durationInNano = (endTime - startTime); // Total execution time in nano seconds
 				fileTime.add(durationInNano);
 				durationInMillis = TimeUnit.NANOSECONDS.toMillis(durationInNano);
+				if (doc != null)
+				{
+					String content = doc.getGuid() + "\t" + doc.getSearchKey() + "\t" + durationInNano + "\t" + durationInMillis;
+					streamRun.println(content);
 				
-				String content = doc.getGuid() + "\t" + doc.getSearchKey() + "\t" + durationInNano + "\t" + durationInMillis;
-				streamRun.println(content);
-				
-				stream.append(doc.getSearchKey() + " ");
-				found++;
+					stream.append(doc.getSearchKey() + " ");
+					found++;
+				}
+				else
+				{
+					System.out.println("doc null for :" + nextGuid);
+				}
 				if (found % 1000 == 0)
 				{
 					System.out.println("Found " + found);
